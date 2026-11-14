@@ -91,15 +91,24 @@ mod tests {
     fn parses_target_with_and_without_id() {
         assert_eq!(
             parse(&["rm", "GitHub"]).unwrap(),
-            Command::Rm(Target { service: "GitHub".into(), id: None })
+            Command::Rm(Target {
+                service: "GitHub".into(),
+                id: None
+            })
         );
         assert_eq!(
             parse(&["show", "GitHub", "--id", "me"]).unwrap(),
-            Command::Show(Target { service: "GitHub".into(), id: Some("me".into()) })
+            Command::Show(Target {
+                service: "GitHub".into(),
+                id: Some("me".into())
+            })
         );
         assert_eq!(
             parse(&["edit", "GitHub", "--id", "me"]).unwrap(),
-            Command::Edit(Target { service: "GitHub".into(), id: Some("me".into()) })
+            Command::Edit(Target {
+                service: "GitHub".into(),
+                id: Some("me".into())
+            })
         );
     }
 
