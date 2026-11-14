@@ -34,3 +34,12 @@ Key spec constraints that shape the design (see `spec/spec.md` for details):
 - Write Rust tests alongside each feature as it is implemented (`#[cfg(test)] mod tests`). CLI parsing tests use `Cli::try_parse_from` via the `parse` helper so errors can be asserted.
 - Source comments must be in English (spec requirement). Note: `///` doc comments on clap items become `--help` text.
 - Do not install tools on your own; propose them and let the user install them.
+
+## Workflow (GitHub Flow)
+
+- `master` is always deployable; never commit directly to it.
+- For every change, create a short-lived topic branch from the latest `master` with a descriptive name (e.g. `feature/search-command`, `fix/clipboard-clear`, `docs/update-spec`).
+- Commit in small, focused units and push the branch to `origin` early.
+- Open a pull request against `master` with `gh pr create`; describe what changed and why, and link related issues.
+- Before merging, `cargo fmt --check`, `cargo clippy`, and `cargo test` must pass.
+- Merge via the pull request, then delete the topic branch (locally and on `origin`).
