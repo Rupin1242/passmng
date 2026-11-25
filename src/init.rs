@@ -215,7 +215,13 @@ mod tests {
         let config = Config::load(&config_path).unwrap();
         assert_eq!(config.vault_dir, vault_dir);
         let data = std::fs::read(config.vault_path()).unwrap();
-        assert!(Vault::decrypt(&data, b"master").unwrap().entries.is_empty());
+        assert!(
+            Vault::decrypt(&data, b"master")
+                .unwrap()
+                .0
+                .entries
+                .is_empty()
+        );
     }
 
     #[test]

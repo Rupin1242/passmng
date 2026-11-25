@@ -24,10 +24,6 @@ impl Config {
         self.vault_dir.join(VAULT_FILE_NAME)
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by the commands after init")
-    )]
     pub fn load(path: &Path) -> Result<Self> {
         let text = fs::read_to_string(path)
             .with_context(|| format!("failed to read config {}", path.display()))?;
