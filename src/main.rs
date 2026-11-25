@@ -1,4 +1,11 @@
+use std::process::ExitCode;
+
 use clap::{Args, Parser, Subcommand};
+
+mod config;
+mod fsutil;
+mod init;
+mod vault;
 
 /// A local-only password manager
 #[derive(Debug, Parser)]
@@ -52,10 +59,20 @@ struct SearchArgs {
     note: bool,
 }
 
-fn main() {
+fn main() -> ExitCode {
     let cli = Cli::parse();
-    match cli.command {
-        Command::Init => println!("init: 未実装"),
+    match run(cli.command) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: {e:#}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run(command: Command) -> anyhow::Result<()> {
+    match command {
+        Command::Init => init::run()?,
         Command::Add => println!("add: 未実装"),
         Command::Rm(_) => println!("rm: 未実装"),
         Command::List => println!("list: 未実装"),
@@ -63,6 +80,7 @@ fn main() {
         Command::Show(_) => println!("show: 未実装"),
         Command::Edit(_) => println!("edit: 未実装"),
     }
+    Ok(())
 }
 
 #[cfg(test)]
