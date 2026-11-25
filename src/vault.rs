@@ -80,10 +80,6 @@ impl KdfParams {
 }
 
 /// Why a vault could not be opened.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "used by the commands after init")
-)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum DecryptError {
     /// The file is not a vault or is truncated / of an unknown version.
@@ -148,12 +144,31 @@ impl Vault {
         Ok(data)
     }
 
-    /// Decrypts data produced by [`Vault::encrypt`].
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by the commands after init")
-    )]
-    pub fn decrypt(data: &[u8], password: &[u8]) -> Result<Self, DecryptError> {
+    /// Returns true if an entry with the same (service name, ID) pair exists,
+    /// compared case-insensitively.
+    pub fn contains(&self, service: &str, id: &str) -> bool {
+        self.entries
+            .iter()
+            .any(|e| eq_ignore_case(&e.service, service) && eq_ignore_case(&e.id, id))
+    }
+
+    /// Adds `entry`, failing if its (service name, ID) pair already exists.
+    pub fn add(&mut self, entry: Entry) -> Result<()> {
+        if self.contains(&entry.service, &entry.id) {
+            anyhow::bail!(
+                "an entry for service \"{}\" with ID \"{}\" already exists",
+                entry.service,
+                entry.id
+            );
+        }
+        self.entries.push(entry);
+        Ok(())
+    }
+
+    /// Decrypts data produced by [`Vault::encrypt`], also returning the KDF
+    /// parameters from the header so that the vault can be saved again with
+    /// the same cost.
+    pub fn decrypt(data: &[u8], password: &[u8]) -> Result<(Self, KdfParams), DecryptError> {
         let format = |reason: &str| DecryptError::Format(reason.to_owned());
 
         if data.len() < HEADER_LEN || &data[..4] != MAGIC {
@@ -189,8 +204,15 @@ impl Vault {
                 .map_err(|_| DecryptError::WrongPassword)?,
         );
         let text = std::str::from_utf8(&plaintext).map_err(|_| format("payload is not UTF-8"))?;
-        toml::from_str(text).map_err(|_| format("payload is malformed"))
+        let vault = toml::from_str(text).map_err(|_| format("payload is malformed"))?;
+        Ok((vault, params))
     }
+}
+
+/// Compares service names or IDs the way the spec requires: exact text is
+/// stored, but comparisons ignore case.
+pub fn eq_ignore_case(a: &str, b: &str) -> bool {
+    a.to_lowercase() == b.to_lowercase()
 }
 
 /// Derives the encryption key from the master password with Argon2id.
@@ -240,13 +262,19 @@ pub(crate) mod tests {
     fn encrypt_decrypt_round_trip() {
         let vault = sample_vault();
         let data = vault.encrypt(b"master", TEST_PARAMS).unwrap();
-        assert!(Vault::decrypt(&data, b"master").unwrap() == vault);
+        assert!(Vault::decrypt(&data, b"master").unwrap().0 == vault);
     }
 
     #[test]
     fn empty_vault_round_trip() {
         let data = Vault::default().encrypt(b"master", TEST_PARAMS).unwrap();
-        assert!(Vault::decrypt(&data, b"master").unwrap().entries.is_empty());
+        assert!(
+            Vault::decrypt(&data, b"master")
+                .unwrap()
+                .0
+                .entries
+                .is_empty()
+        );
     }
 
     #[test]
@@ -318,12 +346,53 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn decrypt_returns_header_params() {
+        let data = Vault::default().encrypt(b"master", TEST_PARAMS).unwrap();
+        assert_eq!(Vault::decrypt(&data, b"master").unwrap().1, TEST_PARAMS);
+    }
+
+    fn entry(service: &str, id: &str) -> Entry {
+        Entry {
+            service: service.into(),
+            url: "https://example.com".into(),
+            id: id.into(),
+            password: "pw".into(),
+            note: None,
+        }
+    }
+
+    #[test]
+    fn contains_ignores_case() {
+        let vault = sample_vault();
+        assert!(vault.contains("github", "ME"));
+        assert!(vault.contains("GitHub", "me"));
+        assert!(!vault.contains("GitHub", "other"));
+        assert!(!vault.contains("GitLab", "me"));
+    }
+
+    #[test]
+    fn add_allows_new_id_for_existing_service() {
+        let mut vault = sample_vault();
+        vault.add(entry("github", "second")).unwrap();
+        assert_eq!(vault.entries.len(), 3);
+        // Stored exactly as entered.
+        assert_eq!(vault.entries[2].service, "github");
+    }
+
+    #[test]
+    fn add_rejects_duplicate_pair_case_insensitively() {
+        let mut vault = sample_vault();
+        assert!(vault.add(entry("GITHUB", "Me")).is_err());
+        assert_eq!(vault.entries.len(), 2);
+    }
+
+    #[test]
     fn save_writes_decryptable_file() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("vault.bin");
         let vault = sample_vault();
         vault.save(&path, b"master", TEST_PARAMS).unwrap();
         let data = std::fs::read(&path).unwrap();
-        assert!(Vault::decrypt(&data, b"master").unwrap() == vault);
+        assert!(Vault::decrypt(&data, b"master").unwrap().0 == vault);
     }
 }
