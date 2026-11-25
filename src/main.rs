@@ -2,9 +2,13 @@ use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
 
+mod add;
+mod clipboard;
 mod config;
 mod fsutil;
 mod init;
+mod password;
+mod session;
 mod vault;
 
 /// A local-only password manager
@@ -73,7 +77,7 @@ fn main() -> ExitCode {
 fn run(command: Command) -> anyhow::Result<()> {
     match command {
         Command::Init => init::run()?,
-        Command::Add => println!("add: 未実装"),
+        Command::Add => add::run()?,
         Command::Rm(_) => println!("rm: 未実装"),
         Command::List => println!("list: 未実装"),
         Command::Search(_) => println!("search: 未実装"),
